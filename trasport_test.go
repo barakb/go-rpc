@@ -40,10 +40,11 @@ func Benchmark_ping(b *testing.B){
 	}()
 
 	for i := 0; i < b.N; i++ {
-		_, err := trasport.Echo(trasport.LocalAddr(), "foo")
+		res, err := trasport.Echo(trasport.LocalAddr(), "foo")
 		if(err != nil){
 			b.Errorf("expected FOO instead error %v", err)
 		}
+		trasport.Info("res is: ", res);
 
 	}
 }
