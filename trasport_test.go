@@ -7,7 +7,7 @@ import (
 )
 
 func TestTrasport_StartStop(t *testing.T) {
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
+	trasport := NewTCPTransport("127.0.0.1:0", time.Second,  nil)
 	go func() {
 		// this is the server side
 		// it should read message from the consumer channel and reply to them.
@@ -25,4 +25,25 @@ func TestTrasport_StartStop(t *testing.T) {
 		t.Errorf("expected FOO instead %v", res)
 	}
 	fmt.Printf("returns %v\n", res)
+}
+
+
+func Benchmark_ping(b *testing.B){
+	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
+	go func() {
+		for {
+			// this is the server side
+			// it should read message from the consumer channel and reply to them.
+			rpc := <-trasport.Consumer()
+			rpc.Respond(&EchoResponse{"FOO"}, nil)
+		}
+	}()
+
+	for i := 0; i < b.N; i++ {
+		_, err := trasport.Echo(trasport.LocalAddr(), "foo")
+		if(err != nil){
+			b.Errorf("expected FOO instead error %v", err)
+		}
+
+	}
 }

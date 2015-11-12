@@ -12,19 +12,19 @@ import (
 )
 
 type tcpTransport struct {
+	Logger
 	bindAddr      string
 	listenAddress net.Addr
 	timeout       time.Duration
 	consumer      chan RPC
-	logOutput     io.Writer
 }
 
-func NewTCPTransport(bindAddr string, timeout time.Duration, logOutput io.Writer) *tcpTransport {
-	if logOutput == nil {
-		logOutput = os.Stdout
+func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcpTransport {
+	if logger == nil {
+		logger = NewLogger(os.Stdout)
 	}
-	res := &tcpTransport{bindAddr: bindAddr, timeout: timeout,
-		consumer: make(chan RPC), logOutput: logOutput}
+	res := &tcpTransport{Logger: logger, bindAddr: bindAddr, timeout: timeout,
+		consumer: make(chan RPC)}
 	addressChannel := make(chan net.Addr)
 	go res.listen(addressChannel)
 	// do not return before the server publish itself.
@@ -42,7 +42,7 @@ type EchoResponse struct {
 }
 
 func (t *tcpTransport) LocalAddr() string {
-	if(t.listenAddress != nil){
+	if (t.listenAddress != nil) {
 		return t.listenAddress.String()
 	}
 	return t.bindAddr
@@ -53,7 +53,7 @@ func (t *tcpTransport) Consumer() <-chan RPC {
 }
 
 func (t *tcpTransport) Echo(target string, msg string) (string, error) {
-	fmt.Printf("Echo to  %s\n", target)
+	t.Debug("Echo to  %s\n", target)
 	req := &EchoRequest{msg}
 	resp := &EchoResponse{}
 	if err := genericRPC(target, 0, req, resp); err != nil {
@@ -65,14 +65,14 @@ func (t *tcpTransport) Echo(target string, msg string) (string, error) {
 func (t *tcpTransport) listen(addressChannel chan net.Addr) {
 	server, err := net.Listen("tcp", t.bindAddr)
 	if server == nil {
-		fmt.Printf("couldn't start listening: %v\n", err)
+		t.Info("couldn't start listening: %v\n", err)
 	}
 	addressChannel <- server.Addr()
-	fmt.Printf("Starting listener at %s\n", server.Addr().String())
+	t.Debug("Starting listener at %s\n", server.Addr().String())
 	for {
 		connection, err := server.Accept()
 		if err != nil {
-			fmt.Printf("couldn't accept connection : %v\n", err)
+			t.Info("couldn't accept connection : %v\n", err)
 			continue
 		}
 		go t.handleConnection(connection)
@@ -80,13 +80,13 @@ func (t *tcpTransport) listen(addressChannel chan net.Addr) {
 }
 
 func (t *tcpTransport) handleConnection(conn net.Conn) {
-	fmt.Printf("handleConnection: %v <-> %v\n", conn.LocalAddr(), conn.RemoteAddr())
+	t.Debug("handleConnection: %v <-> %v\n", conn.LocalAddr(), conn.RemoteAddr())
 	for {
 		var rpcType byte
 		err := binary.Read(conn, binary.LittleEndian, &rpcType)
 		if err != nil {
 			if err != io.EOF {
-				fmt.Printf("failed to read rpcType  %v <-> %v error is %#v\n", conn.LocalAddr(), conn.RemoteAddr(), err)
+				t.Debug("failed to read rpcType  %v <-> %v error is %#v\n", conn.LocalAddr(), conn.RemoteAddr(), err)
 			}
 			conn.Close()
 			return
@@ -95,7 +95,7 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 		var size int32
 		err = binary.Read(conn, binary.LittleEndian, &size)
 		if err != nil {
-			fmt.Println("binary.Read failed:", err)
+			t.Debug("binary.Read failed:", err)
 		}
 
 		buf := make([]byte, size)
@@ -103,7 +103,7 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 		conn.Read(buf)
 		req := &EchoRequest{}
 		if err := json.Unmarshal(buf, &req); err != nil {
-			fmt.Printf("failed to Unmarshal request from client %s\n", conn.RemoteAddr())
+			t.Debug("failed to Unmarshal request from client %s\n", conn.RemoteAddr())
 			conn.Close()
 			return
 		}
@@ -116,12 +116,12 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 
 		t.consumer <- rpc
 
-		fmt.Printf("Sending command %#v to consumer, waiting for consumer response\n", rpc.Command)
+		t.Debug("Sending command %#v to consumer, waiting for consumer response\n", rpc.Command)
 		resp := <-respCh
-		fmt.Printf("server got consumer respond %#v, sending it back to client\n", resp)
+		t.Debug("server got consumer respond %#v, sending it back to client\n", resp)
 
-		if err := sendReplyFromServer(conn, &resp); err != nil {
-			fmt.Printf("failed to reply %#v on message %#v to client %s\n", resp, req, conn.RemoteAddr())
+		if err := t.sendReplyFromServer(conn, &resp); err != nil {
+			t.Debug("failed to reply %#v on message %#v to client %s\n", resp, req, conn.RemoteAddr())
 			conn.Close()
 			return
 		}
@@ -131,7 +131,7 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 func genericRPC(address string, rpcType uint8, args interface{}, resp interface{}) error {
 	conn, err := openConnection(address)
 	if err != nil {
-		return fmt.Errorf("Failed to open client connection to %s for sending request %#v error is %v.", address, args, err)
+		return errors.New(fmt.Sprintf("Failed to open client connection to %s for sending request %#v error is %v.", address, args, err))
 	}
 
 	defer conn.Close()
@@ -168,8 +168,8 @@ func sendRPC(conn net.Conn, rpcType uint8, args interface{}) error {
 	return nil
 }
 
-func sendReplyFromServer(conn net.Conn, response *RPCResponse) error {
-	fmt.Printf("sendReplyFromServer %v -> %v %#v \n", conn.LocalAddr(), conn.RemoteAddr(), response.Response)
+func (t *tcpTransport) sendReplyFromServer(conn net.Conn, response *RPCResponse) error {
+	t.Debug("sendReplyFromServer %v -> %v %#v \n", conn.LocalAddr(), conn.RemoteAddr(), response.Response)
 	var bytes []byte
 	var err error
 	if response.Error != nil {
@@ -249,7 +249,7 @@ type RPCResponse struct {
 // RPC has a command, and provides a response mechanism.
 type RPC struct {
 	Command  interface{}
-	RespChan chan<- RPCResponse
+	RespChan chan <- RPCResponse
 }
 
 // Respond is used to respond with a response, error or both
