@@ -9,8 +9,8 @@ import (
 	"net"
 	"os"
 	"time"
-	"bufio"
 )
+var marshaller *Marshaller
 
 type tcpTransport struct {
 	Logger
@@ -95,14 +95,14 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 		}
 
 		var size int32
-		err = connection.readint32(binary.LittleEndian, &size)
+		err = connection.readInt32(binary.LittleEndian, &size)
 		if err != nil {
 			t.Debug("binary.Read failed:", err)
 		}
 
 		buf := make([]byte, size)
 
-		connection.reader.Read(buf)
+		connection.Read(buf)
 		req := &EchoRequest{}
 		if err := json.Unmarshal(buf, &req); err != nil {
 			t.Debug("failed to Unmarshal request from client %s\n", conn.RemoteAddr())
@@ -145,68 +145,25 @@ func genericRPC(address string, rpcType uint8, args interface{}, resp interface{
 }
 
 func sendRPC(conn *Connection, rpcType uint8, args interface{}) error {
-	// write message type
-	if err := conn.writeByte(byte(0)); err != nil {
-		return err
-	}
-
-	// marshal args
-	bytes, err := json.Marshal(args)
-
-	if err != nil {
-		return err
-	}
-
-	// write args len as int32
-	if err := conn.writeInt32(binary.LittleEndian, int32(len(bytes))); err != nil {
-		return err
-	}
-
-	// write marshalled args
-	if _, err = conn.writer.Write(bytes); err != nil {
+	if err := marshaller.Marshal(conn, byte(0), args); err != nil{
 		return err
 	}
 	conn.Flush()
-
 	return nil
 }
 
 func (t *tcpTransport) sendReplyFromServer(conn *Connection, response *RPCResponse) error {
 	t.Debug("sendReplyFromServer %v -> %v %#v \n", conn.conn.LocalAddr(), conn.conn.RemoteAddr(), response.Response)
-	var bytes []byte
-	var err error
 	if response.Error != nil {
-		if err := conn.writeByte(byte(1)); err != nil {
-			return err
-		}
-		// marshal args
-		bytes, err = json.Marshal(response.Error.Error())
-		if err != nil {
+		if err := marshaller.Marshal(conn, byte(1), response.Error.Error()); err != nil {
 			return err
 		}
 	} else {
-		if err := conn.writeByte(byte(0)); err != nil {
+		if err := marshaller.Marshal(conn, byte(0), response.Response); err != nil {
 			return err
 		}
-		// marshal args
-		bytes, err = json.Marshal(response.Response)
-		if err != nil {
-			return err
-		}
-
-	}
-
-	// write args len as int32
-	if err := conn.writeInt32(binary.LittleEndian, int32(len(bytes))); err != nil {
-		return err
-	}
-	// write marshalled args
-	if _, err = conn.writer.Write(bytes); err != nil {
-		return err
 	}
 	conn.Flush()
-
-
 	return nil
 }
 
@@ -217,13 +174,13 @@ func decodeResponse(conn *Connection, resp interface{}) error {
 	}
 
 	var size int32
-	err := conn.readint32(binary.LittleEndian, &size)
+	err := conn.readInt32(binary.LittleEndian, &size)
 	if err != nil {
 		return err
 	}
 	buf := make([]byte, size)
 
-	_, err = conn.reader.Read(buf)
+	_, err = conn.Read(buf)
 	if err != nil {
 		return err
 	}
@@ -241,39 +198,6 @@ func decodeResponse(conn *Connection, resp interface{}) error {
 	return nil
 }
 
-
-func openConnection(address string) (*Connection, error) {
-	con, err := net.Dial("tcp", address)
-	if (err != nil) {
-		return nil, err
-	}
-	reader := bufio.NewReader(con)
-	writer := bufio.NewWriter(con)
-	return &Connection{reader, writer, con}, nil
-}
-
-func wrap(conn  net.Conn)(*Connection){
-	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
-	return &Connection{reader, writer, conn}
-}
-
-type Connection struct {
-	reader *bufio.Reader
-	writer *bufio.Writer
-	conn   net.Conn
-}
-
-func (cc Connection) Close() (error) {
-	if err:= cc.conn.Close(); err != nil{
-		return err
-	}
-	return nil
-}
-
-func (cc Connection) Flush() (error) {
-	return cc.writer.Flush()
-}
 
 
 type RPCResponse struct {
@@ -299,59 +223,3 @@ type Transport interface {
 }
 
 
-func (c Connection) readByte(data *byte) (error) {
-	var b [1]byte
-	if _, err := readFull(c.reader, b[:]); err != nil {
-		return err
-	}
-	*data = b[0]
-	return nil
-}
-
-func (c Connection) readint32(order binary.ByteOrder, data *int32) (error) {
-	var b [4]byte
-	if _, err := readFull(c.reader, b[:]); err != nil {
-		return err
-	}
-	*data = int32(order.Uint32(b[:]))
-	return nil
-}
-
-func (c Connection) writeByte(data byte) error {
-	var b  [1]byte
-	b[0] = data
-	if _, err := c.writer.Write(b[:]); err != nil{
-		return err
-	}
-	return nil
-}
-
-func (c Connection) writeInt32(order binary.ByteOrder, data int32) error {
-	var b  [4]byte
-	order.PutUint32(b[:], uint32(data))
-	if _, err := c.writer.Write(b[:]); err != nil{
-		return err
-	}
-	return nil
-}
-
-func readFull(r *bufio.Reader, buf []byte) (n int, err error) {
-	return readAtLeast(r, buf, len(buf))
-}
-
-func readAtLeast(r *bufio.Reader, buf []byte, min int) (n int, err error) {
-	if len(buf) < min {
-		return 0, io.ErrShortBuffer
-	}
-	for n < min && err == nil {
-		var nn int
-		nn, err = r.Read(buf[n:])
-		n += nn
-	}
-	if n >= min {
-		err = nil
-	} else if n > 0 && err == io.EOF {
-		err = io.ErrUnexpectedEOF
-	}
-	return
-}
