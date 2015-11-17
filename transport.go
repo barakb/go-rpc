@@ -1,8 +1,6 @@
 package rpc
 
 import (
-	"encoding/binary"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -76,37 +74,19 @@ func (t *tcpTransport) listen(addressChannel chan net.Addr) {
 			t.Info("couldn't accept connection : %v\n", err)
 			continue
 		}
-		go t.handleConnection(connection)
+		go t.handleConnection(wrap(connection))
 	}
 }
 
-func (t *tcpTransport) handleConnection(conn net.Conn) {
-	t.Debug("handleConnection: %v <-> %v\n", conn.LocalAddr(), conn.RemoteAddr())
-	connection := wrap(conn);
+func (t *tcpTransport) handleConnection(conn *Connection) {
+	t.Debug("handleConnection: %v <-> %v\n", conn.conn.LocalAddr(), conn.conn.RemoteAddr())
 	for {
-		var rpcType byte
-		err := connection.readByte(&rpcType)
+		req, err := marshaller.UnMarshalRequest(conn)
 		if err != nil {
 			if err != io.EOF {
-				t.Debug("failed to read rpcType  %v <-> %v error is %#v\n", conn.LocalAddr(), conn.RemoteAddr(), err)
+				t.Debug("failed to read rpcType  %v <-> %v error is %#v\n", conn.conn.LocalAddr(), conn.conn.RemoteAddr(), err)
 			}
-			connection.Close()
-			return
-		}
-
-		var size int32
-		err = connection.readInt32(binary.LittleEndian, &size)
-		if err != nil {
-			t.Debug("binary.Read failed:", err)
-		}
-
-		buf := make([]byte, size)
-
-		connection.Read(buf)
-		req := &EchoRequest{}
-		if err := json.Unmarshal(buf, &req); err != nil {
-			t.Debug("failed to Unmarshal request from client %s\n", conn.RemoteAddr())
-			connection.Close()
+			conn.Close()
 			return
 		}
 
@@ -122,9 +102,9 @@ func (t *tcpTransport) handleConnection(conn net.Conn) {
 		resp := <-respCh
 		t.Debug("server got consumer respond %#v, sending it back to client\n", resp)
 
-		if err := t.sendReplyFromServer(connection, &resp); err != nil {
-			t.Debug("failed to reply %#v on message %#v to client %s\n", resp, req, conn.RemoteAddr())
-			connection.Close()
+		if err := t.sendReplyFromServer(conn, &resp); err != nil {
+			t.Debug("failed to reply %#v on message %#v to client %s\n", resp, req, conn.conn.RemoteAddr())
+			conn.Close()
 			return
 		}
 	}
@@ -141,7 +121,7 @@ func genericRPC(address string, rpcType uint8, args interface{}, resp interface{
 	if err := sendRPC(conn, rpcType, args); err != nil {
 		return err
 	}
-	return decodeResponse(conn, resp)
+	return marshaller.UnMarshalResponse(conn, resp)
 }
 
 func sendRPC(conn *Connection, rpcType uint8, args interface{}) error {
@@ -166,38 +146,6 @@ func (t *tcpTransport) sendReplyFromServer(conn *Connection, response *RPCRespon
 	conn.Flush()
 	return nil
 }
-
-func decodeResponse(conn *Connection, resp interface{}) error {
-	var isError byte
-	if err := conn.readByte(&isError); err != nil {
-		return err
-	}
-
-	var size int32
-	err := conn.readInt32(binary.LittleEndian, &size)
-	if err != nil {
-		return err
-	}
-	buf := make([]byte, size)
-
-	_, err = conn.Read(buf)
-	if err != nil {
-		return err
-	}
-	if isError == 1 {
-		var errorMessage string
-		if err := json.Unmarshal(buf, &errorMessage); err != nil {
-			return err
-		}
-		return errors.New(errorMessage)
-	} else {
-		if err := json.Unmarshal(buf, resp); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 
 
 type RPCResponse struct {
