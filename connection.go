@@ -10,22 +10,23 @@ type Connection struct {
 	reader *bufio.Reader
 	writer *bufio.Writer
 	conn   net.Conn
+	address string;
 }
 
-func openConnection(address string) (*Connection, error) {
+func OpenConnection(address string) (*Connection, error) {
 	con, err := net.Dial("tcp", address)
 	if (err != nil) {
 		return nil, err
 	}
 	reader := bufio.NewReader(con)
 	writer := bufio.NewWriter(con)
-	return &Connection{reader, writer, con}, nil
+	return &Connection{reader, writer, con, address}, nil
 }
 
 func wrap(conn  net.Conn)(*Connection){
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
-	return &Connection{reader, writer, conn}
+	return &Connection{reader, writer, conn, ""}
 }
 
 func (cc Connection) Close() (error) {

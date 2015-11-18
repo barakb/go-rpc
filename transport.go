@@ -10,12 +10,14 @@ import (
 )
 var marshaller *Marshaller
 
+
 type tcpTransport struct {
 	Logger
 	bindAddr      string
 	listenAddress net.Addr
 	timeout       time.Duration
 	consumer      chan RPC
+	connectionPool *ConnectionPool
 }
 
 func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcpTransport {
@@ -23,7 +25,7 @@ func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcp
 		logger = NewLogger(os.Stdout)
 	}
 	res := &tcpTransport{Logger: logger, bindAddr: bindAddr, timeout: timeout,
-		consumer: make(chan RPC)}
+		consumer: make(chan RPC), connectionPool: NewConnectionPool(4, logger)}
 	addressChannel := make(chan net.Addr)
 	go res.listen(addressChannel)
 	// do not return before the server publish itself.
@@ -55,7 +57,7 @@ func (t *tcpTransport) Echo(target string, msg string) (string, error) {
 	t.Debug("Echo to  %s\n", target)
 	req := &EchoRequest{msg}
 	resp := &EchoResponse{}
-	if err := genericRPC(target, 0, req, resp); err != nil {
+	if err := t.genericRPC(target, 0, req, resp); err != nil {
 		return "", err
 	}
 	return resp.Msg, nil
@@ -110,13 +112,15 @@ func (t *tcpTransport) handleConnection(conn *Connection) {
 	}
 }
 
-func genericRPC(address string, rpcType uint8, args interface{}, resp interface{}) error {
-	conn, err := openConnection(address)
+func (t *tcpTransport)genericRPC(address string, rpcType uint8, args interface{}, resp interface{}) error {
+//	conn, err := openConnection(address)
+	conn, err := t.connectionPool.Get(address)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Failed to open client connection to %s for sending request %#v error is %v.", address, args, err))
 	}
 
-	defer conn.Close()
+//	defer conn.Close()
+	defer t.connectionPool.Put(conn)
 
 	if err := sendRPC(conn, rpcType, args); err != nil {
 		return err
