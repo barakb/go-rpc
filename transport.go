@@ -8,15 +8,15 @@ import (
 	"os"
 	"time"
 )
-var marshaller *Marshaller
 
+var marshaller *Marshaller
 
 type tcpTransport struct {
 	Logger
-	bindAddr      string
-	listenAddress net.Addr
-	timeout       time.Duration
-	consumer      chan RPC
+	bindAddr       string
+	listenAddress  net.Addr
+	timeout        time.Duration
+	consumer       chan RPC
 	connectionPool *ConnectionPool
 }
 
@@ -43,7 +43,7 @@ type EchoResponse struct {
 }
 
 func (t *tcpTransport) LocalAddr() string {
-	if (t.listenAddress != nil) {
+	if t.listenAddress != nil {
 		return t.listenAddress.String()
 	}
 	return t.bindAddr
@@ -112,14 +112,14 @@ func (t *tcpTransport) handleConnection(conn *Connection) {
 	}
 }
 
-func (t *tcpTransport)genericRPC(address string, rpcType uint8, args interface{}, resp interface{}) error {
-//	conn, err := openConnection(address)
+func (t *tcpTransport) genericRPC(address string, rpcType uint8, args interface{}, resp interface{}) error {
+	//	conn, err := openConnection(address)
 	conn, err := t.connectionPool.Get(address)
 	if err != nil {
 		return errors.New(fmt.Sprintf("Failed to open client connection to %s for sending request %#v error is %v.", address, args, err))
 	}
 
-//	defer conn.Close()
+	//	defer conn.Close()
 	defer t.connectionPool.Put(conn)
 
 	if err := sendRPC(conn, rpcType, args); err != nil {
@@ -129,7 +129,7 @@ func (t *tcpTransport)genericRPC(address string, rpcType uint8, args interface{}
 }
 
 func sendRPC(conn *Connection, rpcType uint8, args interface{}) error {
-	if err := marshaller.Marshal(conn, byte(0), args); err != nil{
+	if err := marshaller.Marshal(conn, byte(0), args); err != nil {
 		return err
 	}
 	conn.Flush()
@@ -151,7 +151,6 @@ func (t *tcpTransport) sendReplyFromServer(conn *Connection, response *RPCRespon
 	return nil
 }
 
-
 type RPCResponse struct {
 	Response interface{}
 	Error    error
@@ -160,7 +159,7 @@ type RPCResponse struct {
 // RPC has a command, and provides a response mechanism.
 type RPC struct {
 	Command  interface{}
-	RespChan chan <- RPCResponse
+	RespChan chan<- RPCResponse
 }
 
 // Respond is used to respond with a response, error or both
@@ -173,5 +172,3 @@ type Transport interface {
 	LocalAddr() string
 	Echo(target string, msg string) (string, error)
 }
-
-

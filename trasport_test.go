@@ -2,16 +2,14 @@ package rpc
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 	"time"
-	"runtime"
 )
-
-
 
 func TestTrasport_StartStop(t *testing.T) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second,  nil)
+	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
 	go func() {
 		// this is the server side
 		// it should read message from the consumer channel and reply to them.
@@ -31,8 +29,7 @@ func TestTrasport_StartStop(t *testing.T) {
 	fmt.Printf("returns %v\n", res)
 }
 
-
-func Benchmark_ping(b *testing.B){
+func Benchmark_ping(b *testing.B) {
 	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
 	go func() {
 		for {
@@ -45,15 +42,15 @@ func Benchmark_ping(b *testing.B){
 
 	for i := 0; i < b.N; i++ {
 		res, err := trasport.Echo(trasport.LocalAddr(), "foo")
-		if(err != nil){
+		if err != nil {
 			b.Errorf("expected FOO instead error %v", err)
 		}
-		trasport.Info("res is: ", res);
+		trasport.Info("res is: ", res)
 
 	}
 }
 
-func Benchmark_ping_parallel(b *testing.B){
+func Benchmark_ping_parallel(b *testing.B) {
 	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
 	go func() {
 		for {
@@ -64,13 +61,13 @@ func Benchmark_ping_parallel(b *testing.B){
 		}
 	}()
 
-	b.RunParallel(func(pb *testing.PB){
+	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			res, err := trasport.Echo(trasport.LocalAddr(), "foo")
-			if(err != nil){
+			if err != nil {
 				b.Errorf("expected FOO instead error %v", err)
 			}
-			trasport.Info("res is: ", res);
+			trasport.Info("res is: ", res)
 		}
 	})
 }

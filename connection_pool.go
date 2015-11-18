@@ -1,7 +1,8 @@
 package rpc
+
 import (
-	"sync"
 	"errors"
+	"sync"
 )
 
 type ConnectionPool struct {
@@ -13,11 +14,11 @@ type ConnectionPool struct {
 }
 
 func NewConnectionPool(size int, logger Logger) *ConnectionPool {
-	return &ConnectionPool{size:size, connectionsMap:make(map[string]chan *Connection), logger:logger}
+	return &ConnectionPool{size: size, connectionsMap: make(map[string]chan *Connection), logger: logger}
 }
 
 func (p *ConnectionPool) Get(address string) (*Connection, error) {
-	p.mutex.Lock();
+	p.mutex.Lock()
 	if p.closed {
 		p.mutex.Unlock()
 		return nil, errors.New("Pool is closed")
@@ -61,10 +62,10 @@ func (p *ConnectionPool) Put(connection *Connection) {
 }
 
 func (p *ConnectionPool) Close() {
-	p.mutex.Lock();
+	p.mutex.Lock()
 	p.closed = true
 	p.mutex.Unlock()
-	for _, connections := range p.connectionsMap{
+	for _, connections := range p.connectionsMap {
 		close(connections)
 		select {
 		case connection := <-connections:
@@ -75,6 +76,3 @@ func (p *ConnectionPool) Close() {
 	p.connectionsMap = make(map[string]chan *Connection)
 
 }
-
-
-
