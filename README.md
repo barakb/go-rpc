@@ -10,7 +10,6 @@ A very naive RPC implementation in GO.
 * Without connection pool
 
 Benchmark_ping-4	    5000	    268994 ns/op
-ok  	com.githab.barakb/rpc	1.377s
 
 
 * With connection pool
