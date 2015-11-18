@@ -43,7 +43,7 @@ func (p *ConnectionPool) Put(connection *Connection) {
 	p.mutex.RLock()
 	if p.closed {
 		p.mutex.Unlock()
-		p.logger.Debug("Disaposing live connection [%s]", connection.address)
+		p.logger.Debug("Disaposing live connection [%s], pool is closed", connection.address)
 		connection.Close()
 		return
 	}
@@ -71,6 +71,6 @@ func (p *ConnectionPool) Close() {
 		default:
 		}
 	}
-	p.connectionsMap = make(map[string]chan *Connection)
+	p.connectionsMap = nil
 
 }
