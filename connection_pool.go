@@ -23,12 +23,10 @@ func (p *ConnectionPool) Get(address string) (*Connection, error) {
 		p.mutex.Unlock()
 		return nil, errors.New("Pool is closed")
 	}
-	connections := p.connectionsMap[address]
-	if connections == nil {
-		if connections = p.connectionsMap[address]; connections == nil {
-			connections = make(chan *Connection, p.size)
-			p.connectionsMap[address] = connections
-		}
+	var connections chan *Connection
+	if connections = p.connectionsMap[address]; connections == nil{
+		connections = make(chan *Connection, p.size)
+		p.connectionsMap[address] = connections
 	}
 	p.mutex.Unlock()
 
