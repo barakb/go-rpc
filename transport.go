@@ -11,6 +11,12 @@ import (
 
 var marshaller *Marshaller
 
+type CloseStatus struct{
+	CloseRequest chan interface{}
+	CloseResponse chan interface{}
+	closed bool
+}
+
 type tcpTransport struct {
 	Logger
 	bindAddr       string
@@ -18,14 +24,19 @@ type tcpTransport struct {
 	timeout        time.Duration
 	consumer       chan RPC
 	connectionPool *ConnectionPool
+	server          net.Listener
+	closeStatus CloseStatus
 }
 
 func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcpTransport {
 	if logger == nil {
 		logger = NewLogger(os.Stdout)
 	}
+	closeStatus := CloseStatus{make(chan interface{}),make(chan interface{}), false}
 	res := &tcpTransport{Logger: logger, bindAddr: bindAddr, timeout: timeout,
-		consumer: make(chan RPC), connectionPool: NewConnectionPool(4, logger)}
+		consumer: make(chan RPC), connectionPool: NewConnectionPool(4, logger),
+		closeStatus: closeStatus}
+
 	addressChannel := make(chan net.Addr)
 	go res.listen(addressChannel)
 	// do not return before the server publish itself.
@@ -53,6 +64,19 @@ func (t *tcpTransport) Consumer() <-chan RPC {
 	return t.consumer
 }
 
+func (t *tcpTransport) Close() chan interface{} {
+	if !t.closeStatus.closed {
+		t.closeStatus.closed = true
+		t.closeStatus.CloseRequest <- true
+		t.server.Close()
+		go func() {
+			<-t.closeStatus.CloseResponse
+			t.connectionPool.Close()
+		}()
+	}
+	return t.closeStatus.CloseResponse;
+}
+
 func (t *tcpTransport) Echo(target string, msg string) (string, error) {
 	t.Debug("Echo to  %s\n", target)
 	req := &EchoRequest{msg}
@@ -64,17 +88,23 @@ func (t *tcpTransport) Echo(target string, msg string) (string, error) {
 }
 
 func (t *tcpTransport) listen(addressChannel chan net.Addr) {
-	server, err := net.Listen("tcp", t.bindAddr)
-	if server == nil {
+	var err error;
+	t.server, err = net.Listen("tcp", t.bindAddr)
+	if t.server == nil {
 		t.Info("couldn't start listening: %v\n", err)
 	}
-	addressChannel <- server.Addr()
-	t.Debug("Starting listener at %s\n", server.Addr().String())
+	addressChannel <- t.server.Addr()
+	t.Debug("Starting listener at %s\n", t.server.Addr().String())
 	for {
-		connection, err := server.Accept()
+		connection, err := t.server.Accept()
 		if err != nil {
-			t.Info("couldn't accept connection : %v\n", err)
-			continue
+			if neterr, ok := err.(*net.OpError); ok && neterr.Op == "close" {
+				close(t.closeStatus.CloseResponse);
+				return;
+			}else {
+				t.Info("couldn't accept connection : %v\n", err)
+				continue
+			}
 		}
 		go t.handleConnection(wrap(connection))
 	}

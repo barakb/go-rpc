@@ -2,13 +2,11 @@ package rpc
 
 import (
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 )
 
 func TestTrasport_StartStop(t *testing.T) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
 	go func() {
 		// this is the server side
@@ -28,6 +26,7 @@ func TestTrasport_StartStop(t *testing.T) {
 	}
 	fmt.Printf("returns %v\n", res)
 }
+
 
 func Benchmark_ping(b *testing.B) {
 	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
