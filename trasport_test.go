@@ -27,6 +27,19 @@ func TestTrasport_StartStop(t *testing.T) {
 	fmt.Printf("returns %v\n", res)
 }
 
+func TestTrasport_StartClose(t *testing.T) {
+	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
+	go func() {
+		<-trasport.Consumer()
+		trasport.Close()
+	}()
+
+	// this is the client side
+	_, err := trasport.Echo(trasport.LocalAddr(), "foo")
+	if err == nil {
+		t.Errorf("Expected error because trasport is closed")
+	}
+}
 
 func Benchmark_ping(b *testing.B) {
 	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())

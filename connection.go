@@ -11,6 +11,22 @@ type Connection struct {
 	writer  *bufio.Writer
 	conn    net.Conn
 	address string
+	context *Context
+}
+
+type Context struct {
+	activeConnections map[string]*Connection
+}
+
+func NewContext() *Context {
+	return &Context{make(map[string]*Connection)}
+}
+
+func (context *Context) Close() {
+	for _, connection := range context.activeConnections {
+		connection.Close()
+	}
+	context.activeConnections = make(map[string]*Connection)
 }
 
 func OpenConnection(address string) (*Connection, error) {
@@ -20,16 +36,21 @@ func OpenConnection(address string) (*Connection, error) {
 	}
 	reader := bufio.NewReader(con)
 	writer := bufio.NewWriter(con)
-	return &Connection{reader, writer, con, address}, nil
+	return &Connection{reader, writer, con, address, nil}, nil
 }
 
-func wrap(conn net.Conn) *Connection {
+func wrap(conn net.Conn, context *Context) *Connection {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
-	return &Connection{reader, writer, conn, ""}
+	res := &Connection{reader, writer, conn, "", context}
+	context.activeConnections[conn.LocalAddr().String()] = res
+	return res
 }
 
 func (cc Connection) Close() error {
+	if cc.context != nil {
+		delete(cc.context.activeConnections, cc.conn.LocalAddr().String())
+	}
 	if err := cc.conn.Close(); err != nil {
 		return err
 	}

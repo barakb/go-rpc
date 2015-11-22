@@ -24,7 +24,7 @@ func (p *ConnectionPool) Get(address string) (*Connection, error) {
 		return nil, errors.New("Pool is closed")
 	}
 	var connections chan *Connection
-	if connections = p.connectionsMap[address]; connections == nil{
+	if connections = p.connectionsMap[address]; connections == nil {
 		connections = make(chan *Connection, p.size)
 		p.connectionsMap[address] = connections
 	}
@@ -42,7 +42,7 @@ func (p *ConnectionPool) Get(address string) (*Connection, error) {
 func (p *ConnectionPool) Put(connection *Connection) {
 	p.mutex.RLock()
 	if p.closed {
-		p.mutex.Unlock()
+		p.mutex.RUnlock()
 		p.logger.Debug("Disaposing live connection [%s], pool is closed", connection.address)
 		connection.Close()
 		return
@@ -63,14 +63,23 @@ func (p *ConnectionPool) Close() {
 	p.mutex.Lock()
 	p.closed = true
 	p.mutex.Unlock()
-	for _, connections := range p.connectionsMap {
-		close(connections)
-		select {
-		case connection := <-connections:
-			connection.Close()
-		default:
-		}
+	for key, connections := range p.connectionsMap {
+		p.closeAll(key, connections)
 	}
 	p.connectionsMap = nil
+}
 
+func (p *ConnectionPool) closeAll(address string, connections chan *Connection) {
+	close(connections)
+	for {
+		select {
+		case connection := <-connections:
+			if connection == nil {
+				return
+			}
+			connection.Close()
+		default:
+			return
+		}
+	}
 }

@@ -11,12 +11,6 @@ import (
 
 var marshaller *Marshaller
 
-type CloseStatus struct{
-	CloseRequest chan interface{}
-	CloseResponse chan interface{}
-	closed bool
-}
-
 type tcpTransport struct {
 	Logger
 	bindAddr       string
@@ -24,19 +18,19 @@ type tcpTransport struct {
 	timeout        time.Duration
 	consumer       chan RPC
 	connectionPool *ConnectionPool
-	server          net.Listener
-	closeStatus CloseStatus
+	server         net.Listener
+	context        *Context
+	quit           chan interface{}
 }
 
 func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcpTransport {
 	if logger == nil {
 		logger = NewLogger(os.Stdout)
 	}
-	closeStatus := CloseStatus{make(chan interface{}),make(chan interface{}), false}
 	res := &tcpTransport{Logger: logger, bindAddr: bindAddr, timeout: timeout,
 		consumer: make(chan RPC), connectionPool: NewConnectionPool(4, logger),
-		closeStatus: closeStatus}
-
+		context: NewContext()}
+	res.quit = make(chan interface{})
 	addressChannel := make(chan net.Addr)
 	go res.listen(addressChannel)
 	// do not return before the server publish itself.
@@ -64,17 +58,11 @@ func (t *tcpTransport) Consumer() <-chan RPC {
 	return t.consumer
 }
 
-func (t *tcpTransport) Close() chan interface{} {
-	if !t.closeStatus.closed {
-		t.closeStatus.closed = true
-		t.closeStatus.CloseRequest <- true
-		t.server.Close()
-		go func() {
-			<-t.closeStatus.CloseResponse
-			t.connectionPool.Close()
-		}()
-	}
-	return t.closeStatus.CloseResponse;
+func (t *tcpTransport) Close() {
+	close(t.quit)
+	t.server.Close()
+	t.connectionPool.Close()
+	t.context.Close()
 }
 
 func (t *tcpTransport) Echo(target string, msg string) (string, error) {
@@ -88,7 +76,7 @@ func (t *tcpTransport) Echo(target string, msg string) (string, error) {
 }
 
 func (t *tcpTransport) listen(addressChannel chan net.Addr) {
-	var err error;
+	var err error
 	t.server, err = net.Listen("tcp", t.bindAddr)
 	if t.server == nil {
 		t.Info("couldn't start listening: %v\n", err)
@@ -98,15 +86,16 @@ func (t *tcpTransport) listen(addressChannel chan net.Addr) {
 	for {
 		connection, err := t.server.Accept()
 		if err != nil {
-			if neterr, ok := err.(*net.OpError); ok && neterr.Op == "close" {
-				close(t.closeStatus.CloseResponse);
-				return;
-			}else {
-				t.Info("couldn't accept connection : %v\n", err)
+			select {
+			case <-t.quit:
+				return
+			default:
+				t.Info("Failed to accept connection : %#v \n", err)
 				continue
 			}
 		}
-		go t.handleConnection(wrap(connection))
+		con := wrap(connection, t.context)
+		go t.handleConnection(con)
 	}
 }
 
