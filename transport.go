@@ -39,13 +39,6 @@ func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcp
 	return res
 }
 
-type EchoRequest struct {
-	Msg string
-}
-
-type EchoResponse struct {
-	Msg string
-}
 
 func (t *tcpTransport) LocalAddr() string {
 	if t.listenAddress != nil {
@@ -63,16 +56,6 @@ func (t *tcpTransport) Close() {
 	t.server.Close()
 	t.connectionPool.Close()
 	t.context.Close()
-}
-
-func (t *tcpTransport) Echo(target string, msg string) (string, error) {
-	t.Debug("Echo to  %s\n", target)
-	req := &EchoRequest{msg}
-	resp := &EchoResponse{}
-	if err := t.genericRPC(target, 0, req, resp); err != nil {
-		return "", err
-	}
-	return resp.Msg, nil
 }
 
 func (t *tcpTransport) listen(addressChannel chan net.Addr) {

@@ -3,21 +3,20 @@ package rpc
 import (
 	"fmt"
 	"testing"
-	"time"
 )
 
-func TestTrasport_StartStop(t *testing.T) {
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
+func TestServer_StartStop(t *testing.T) {
+	server := NewServer(nil)
 	go func() {
 		// this is the server side
 		// it should read message from the consumer channel and reply to them.
-		rpc := <-trasport.Consumer()
+		rpc := <-server.Consumer()
 		fmt.Printf("consumer got rpc command %#v\n", rpc.Command)
 		rpc.Respond(&EchoResponse{"FOO"}, nil)
 	}()
 
 	// this is the client side
-	res, err := trasport.Echo(trasport.LocalAddr(), "foo")
+	res, err := server.Echo(server.LocalAddr(), "foo")
 	if err != nil {
 		t.Errorf("error %#v\n", err)
 	}
@@ -27,59 +26,59 @@ func TestTrasport_StartStop(t *testing.T) {
 	fmt.Printf("returns %v\n", res)
 }
 
-func TestTrasport_StartClose(t *testing.T) {
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second, nil)
+func TestServer_StartClose(t *testing.T) {
+	server := NewServer(nil)
 	go func() {
-		<-trasport.Consumer()
-		trasport.Close()
+		<-server.Consumer()
+		server.Close()
 	}()
 
 	// this is the client side
-	_, err := trasport.Echo(trasport.LocalAddr(), "foo")
+	_, err := server.Echo(server.LocalAddr(), "foo")
 	if err == nil {
 		t.Errorf("Expected error because trasport is closed")
 	}
 }
 
 func Benchmark_ping(b *testing.B) {
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
+	server := NewServer(NewEmptyLogger())
 	go func() {
 		for {
 			// this is the server side
 			// it should read message from the consumer channel and reply to them.
-			rpc := <-trasport.Consumer()
+			rpc := <-server.Consumer()
 			rpc.Respond(&EchoResponse{"FOO"}, nil)
 		}
 	}()
 
 	for i := 0; i < b.N; i++ {
-		res, err := trasport.Echo(trasport.LocalAddr(), "foo")
+		res, err := server.Echo(server.LocalAddr(), "foo")
 		if err != nil {
 			b.Errorf("expected FOO instead error %v", err)
 		}
-		trasport.Info("res is: ", res)
+		server.Info("res is: ", res)
 
 	}
 }
 
 func Benchmark_ping_parallel(b *testing.B) {
-	trasport := NewTCPTransport("127.0.0.1:0", time.Second, NewEmptyLogger())
+	server := NewServer(NewEmptyLogger())
 	go func() {
 		for {
 			// this is the server side
 			// it should read message from the consumer channel and reply to them.
-			rpc := <-trasport.Consumer()
+			rpc := <-server.Consumer()
 			rpc.Respond(&EchoResponse{"FOO"}, nil)
 		}
 	}()
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			res, err := trasport.Echo(trasport.LocalAddr(), "foo")
+			res, err := server.Echo(server.LocalAddr(), "foo")
 			if err != nil {
 				b.Errorf("expected FOO instead error %v", err)
 			}
-			trasport.Info("res is: ", res)
+			server.Info("res is: ", res)
 		}
 	})
 }
