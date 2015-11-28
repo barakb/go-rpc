@@ -43,18 +43,18 @@ func (p *ConnectionPool) Put(connection *Connection) {
 	p.mutex.RLock()
 	if p.closed {
 		p.mutex.RUnlock()
-		p.logger.Debug("Disaposing live connection [%s], pool is closed", connection.address)
+		p.logger.Debug("Disaposing live connection [%s], pool is closed", connection.localAddress)
 		connection.Close()
 		return
 	}
-	connections := p.connectionsMap[connection.address]
+	connections := p.connectionsMap[connection.localAddress]
 	p.mutex.RUnlock()
 
 	select {
 	case connections <- connection:
 		return
 	default:
-		p.logger.Debug("Disaposing live connection [%s]", connection.address)
+		p.logger.Debug("Disaposing live connection [%s]", connection.localAddress)
 		connection.Close()
 	}
 }

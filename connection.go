@@ -4,14 +4,17 @@ import (
 	"bufio"
 	"encoding/binary"
 	"net"
+	"fmt"
 )
 
 type Connection struct {
-	reader  *bufio.Reader
-	writer  *bufio.Writer
-	conn    net.Conn
-	address string
-	context *Context
+	reader        *bufio.Reader
+	writer        *bufio.Writer
+	conn          net.Conn
+	remoteAddress string
+	localAddress  string
+	context       *Context
+	nextMessageId int
 }
 
 type Context struct {
@@ -29,20 +32,21 @@ func (context *Context) Close() {
 	context.activeConnections = make(map[string]*Connection)
 }
 
-func OpenConnection(address string) (*Connection, error) {
-	con, err := net.Dial("tcp", address)
+func OpenConnection(remoteAddress string) (*Connection, error) {
+	con, err := net.Dial("tcp", remoteAddress)
 	if err != nil {
 		return nil, err
 	}
 	reader := bufio.NewReader(con)
 	writer := bufio.NewWriter(con)
-	return &Connection{reader, writer, con, address, nil}, nil
+	localAddress := con.LocalAddr().String()
+	return &Connection{reader, writer, con, remoteAddress, localAddress, nil, 0}, nil
 }
 
-func wrap(conn net.Conn, context *Context) *Connection {
+func Wrap(conn net.Conn, context *Context) *Connection {
 	reader := bufio.NewReader(conn)
 	writer := bufio.NewWriter(conn)
-	res := &Connection{reader, writer, conn, "", context}
+	res := &Connection{reader, writer, conn, conn.LocalAddr().String(), conn.RemoteAddr().String(), context, 0}
 	context.activeConnections[conn.LocalAddr().String()] = res
 	return res
 }
@@ -55,6 +59,21 @@ func (cc Connection) Close() error {
 		return err
 	}
 	return nil
+}
+
+func (c *Connection) NextMessageId() int{
+	ret := c.nextMessageId
+	c.nextMessageId++
+	return ret
+}
+
+
+func (c Connection) LocalAddress() string {
+	return c.localAddress
+}
+
+func (c Connection) RemoteAddress() string {
+	return c.remoteAddress
 }
 
 func (cc Connection) Flush() error {
@@ -75,4 +94,8 @@ func (c Connection) readByte(data *byte) error {
 
 func (c Connection) readInt32(order binary.ByteOrder, data *int32) error {
 	return binary.Read(c, order, data)
+}
+
+func (c Connection) String() string{
+	return fmt.Sprintf("connection: %v <-> %v", c.localAddress, c.remoteAddress)
 }
