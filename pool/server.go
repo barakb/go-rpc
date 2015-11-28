@@ -1,7 +1,7 @@
 package pool
 import (
 "time"
-"com.githab.barakb/rpc"
+"github.com/barakb/rpc"
 )
 
 type Server struct {

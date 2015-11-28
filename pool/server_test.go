@@ -3,7 +3,7 @@ package pool
 import (
 	"fmt"
 	"testing"
-	"com.githab.barakb/rpc"
+	"github.com/barakb/rpc"
 )
 
 func TestServer_StartStop(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"net"
 	"os"
 	"time"
-"com.githab.barakb/rpc"
+	"github.com/barakb/rpc"
 )
 
 var marshaller *rpc.Marshaller
@@ -54,10 +54,10 @@ func (t *tcpTransport) Consumer() <-chan RPC {
 }
 
 func (t *tcpTransport) Close() {
-//	close(t.quit)
-//	t.server.Close()
-//	t.connectionPool.Close()
-//	t.context.Close()
+	//	close(t.quit)
+	//	t.server.Close()
+	//	t.connectionPool.Close()
+	//	t.context.Close()
 }
 
 func (t *tcpTransport) listen(addressChannel chan net.Addr) {
@@ -163,7 +163,7 @@ type RPCResponse struct {
 // RPC has a command, and provides a response mechanism.
 type RPC struct {
 	Command  interface{}
-	RespChan chan<- RPCResponse
+	RespChan chan <- RPCResponse
 }
 
 // Respond is used to respond with a response, error or both

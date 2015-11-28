@@ -1,5 +1,5 @@
 package pool
-import "com.githab.barakb/rpc"
+import "github.com/barakb/rpc"
 
 
 type ConnectionPool struct {
