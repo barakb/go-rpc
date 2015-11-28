@@ -1,14 +1,15 @@
 package pool
+
 import (
-"time"
-"github.com/barakb/rpc"
+	"github.com/barakb/go-rpc"
+	"time"
 )
 
 type Server struct {
 	*tcpTransport
 }
 
-func NewServer(logger rpc.Logger) *Server{
+func NewServer(logger rpc.Logger) *Server {
 	return &Server{NewTCPTransport(":0", time.Second, NewConnectionPool(4), logger)}
 }
 
@@ -19,7 +20,6 @@ type EchoRequest struct {
 type EchoResponse struct {
 	Msg string
 }
-
 
 func (s *Server) Echo(target string, msg string) (string, error) {
 	s.tcpTransport.Debug("Echo to  %s\n", target)
@@ -34,4 +34,3 @@ func (s *Server) Echo(target string, msg string) (string, error) {
 //func (s *Server) Consumer() <-chan RPC {
 //	return s.tcpTransport.consumer
 //}
-

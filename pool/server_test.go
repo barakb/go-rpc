@@ -2,8 +2,8 @@ package pool
 
 import (
 	"fmt"
+	"github.com/barakb/go-rpc"
 	"testing"
-	"github.com/barakb/rpc"
 )
 
 func TestServer_StartStop(t *testing.T) {
@@ -26,7 +26,6 @@ func TestServer_StartStop(t *testing.T) {
 	}
 	fmt.Printf("returns %v\n", res)
 }
-
 
 func BenchmarkNewConnectionPoolPing(b *testing.B) {
 	server := NewServer(rpc.NewEmptyLogger())

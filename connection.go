@@ -3,8 +3,8 @@ package rpc
 import (
 	"bufio"
 	"encoding/binary"
-	"net"
 	"fmt"
+	"net"
 )
 
 type Connection struct {
@@ -61,12 +61,11 @@ func (cc Connection) Close() error {
 	return nil
 }
 
-func (c *Connection) NextMessageId() int{
+func (c *Connection) NextMessageId() int {
 	ret := c.nextMessageId
 	c.nextMessageId++
 	return ret
 }
-
 
 func (c Connection) LocalAddress() string {
 	return c.localAddress
@@ -96,6 +95,6 @@ func (c Connection) readInt32(order binary.ByteOrder, data *int32) error {
 	return binary.Read(c, order, data)
 }
 
-func (c Connection) String() string{
+func (c Connection) String() string {
 	return fmt.Sprintf("connection: %v <-> %v", c.localAddress, c.remoteAddress)
 }

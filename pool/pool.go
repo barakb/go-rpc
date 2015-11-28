@@ -1,29 +1,29 @@
 package pool
-import "sync"
 
+import "sync"
 
 type CreateResource func(name string) (interface{}, string, error)
 type FreeResource func(resource interface{})
 
 type resourceCollection struct {
-	name       string
+	name      string
 	resources map[string]interface{}
 }
 
-func newResourceCollection(name string) *resourceCollection{
+func newResourceCollection(name string) *resourceCollection {
 	return &resourceCollection{name, make(map[string]interface{})}
 }
 
-func (r *resourceCollection) add(value interface{}, key string){
+func (r *resourceCollection) add(value interface{}, key string) {
 	r.resources[key] = value
 }
 
-func (r *resourceCollection) get() (value interface{}, key string, found bool){
-	for key, value = range r.resources{
-		found = true;
-		break;
+func (r *resourceCollection) get() (value interface{}, key string, found bool) {
+	for key, value = range r.resources {
+		found = true
+		break
 	}
-	if found{
+	if found {
 		delete(r.resources, key)
 	}
 	return value, key, found
@@ -55,7 +55,7 @@ func (p *pool) Get(name string) (interface{}, string, error) {
 		return p.createResource(name)
 	}
 	val, key, ok := rc.get()
-	if !ok{
+	if !ok {
 		p.mutex.Unlock()
 		return p.createResource(name)
 	}
@@ -64,13 +64,13 @@ func (p *pool) Get(name string) (interface{}, string, error) {
 	return val, key, nil
 }
 
-func (p *pool) Len() int{
+func (p *pool) Len() int {
 	return p.len
 }
 
 func (p *pool) Return(value interface{}, name string, key string) int {
 	p.mutex.Lock()
-	if(p.len < p.maxSize) {
+	if p.len < p.maxSize {
 		rc, ok := p.resources[name]
 		if !ok {
 			rc = newResourceCollection(name)
@@ -80,10 +80,9 @@ func (p *pool) Return(value interface{}, name string, key string) int {
 		p.len += 1
 		p.mutex.Unlock()
 		return p.len
-	}else{
+	} else {
 		p.mutex.Unlock()
 		p.freeResource(value)
 		return p.len
 	}
 }
-

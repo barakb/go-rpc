@@ -1,37 +1,35 @@
 package pool
-import "github.com/barakb/rpc"
 
+import "github.com/barakb/go-rpc"
 
 type ConnectionPool struct {
 	pool
 }
 
-
-func newConnection(address string) (interface{}, string, error){
+func newConnection(address string) (interface{}, string, error) {
 	var ret interface{}
-	ret, err := rpc.OpenConnection(address);
-	if err != nil{
+	ret, err := rpc.OpenConnection(address)
+	if err != nil {
 		return nil, "", err
 	}
 	remoteAddress := ret.(*rpc.Connection).RemoteAddress()
 	return ret, remoteAddress, nil
 }
 
-func closeConnection(c interface{}){
+func closeConnection(c interface{}) {
 	c.(*rpc.Connection).Close()
 }
 
-
-func NewConnectionPool(size int) *ConnectionPool{
-	return &ConnectionPool{pool : *CreatePool(size, newConnection, closeConnection)}
+func NewConnectionPool(size int) *ConnectionPool {
+	return &ConnectionPool{pool: *CreatePool(size, newConnection, closeConnection)}
 }
 
 func (p *ConnectionPool) Get(address string) (*rpc.Connection, error) {
 	value, _, err := p.pool.Get(address)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
-	return value.(*rpc.Connection), nil;
+	return value.(*rpc.Connection), nil
 }
 
 func (p *ConnectionPool) Put(connection *rpc.Connection) {

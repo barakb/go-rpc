@@ -2,10 +2,9 @@ package pool
 
 import (
 	"fmt"
-	"testing"
 	"net"
+	"testing"
 )
-
 
 func TestConnectionPool(t *testing.T) {
 	l, err := net.Listen("tcp", ":0")
@@ -34,4 +33,3 @@ func TestConnectionPool(t *testing.T) {
 		cp.Put(con)
 	}
 }
-

@@ -39,7 +39,6 @@ func NewTCPTransport(bindAddr string, timeout time.Duration, logger Logger) *tcp
 	return res
 }
 
-
 func (t *tcpTransport) LocalAddr() string {
 	if t.listenAddress != nil {
 		return t.listenAddress.String()
@@ -85,7 +84,7 @@ func (t *tcpTransport) listen(addressChannel chan net.Addr) {
 func (t *tcpTransport) handleConnection(conn *Connection) {
 	t.Debug("handleConnection: %v <-> %v\n", conn.conn.LocalAddr(), conn.conn.RemoteAddr())
 	for {
-		req,err := marshaller.UnMarshalRequest(conn)
+		req, err := marshaller.UnMarshalRequest(conn)
 		if err != nil {
 			if err != io.EOF {
 				t.Debug("failed to read rpcType  %v <-> %v error is %#v\n", conn.conn.LocalAddr(), conn.conn.RemoteAddr(), err)

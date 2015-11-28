@@ -1,14 +1,13 @@
 package pool
 
-
 import (
 	"errors"
 	"fmt"
+	"github.com/barakb/go-rpc"
 	"io"
 	"net"
 	"os"
 	"time"
-	"github.com/barakb/rpc"
 )
 
 var marshaller *rpc.Marshaller
@@ -40,7 +39,6 @@ func NewTCPTransport(bindAddr string, timeout time.Duration, connectionPool *Con
 	close(addressChannel)
 	return res
 }
-
 
 func (t *tcpTransport) LocalAddr() string {
 	if t.listenAddress != nil {
@@ -163,7 +161,7 @@ type RPCResponse struct {
 // RPC has a command, and provides a response mechanism.
 type RPC struct {
 	Command  interface{}
-	RespChan chan <- RPCResponse
+	RespChan chan<- RPCResponse
 }
 
 // Respond is used to respond with a response, error or both
@@ -176,4 +174,3 @@ type Transport interface {
 	LocalAddr() string
 	Echo(target string, msg string) (string, error)
 }
-

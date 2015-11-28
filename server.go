@@ -1,11 +1,12 @@
 package rpc
+
 import "time"
 
 type Server struct {
 	*tcpTransport
 }
 
-func NewServer(logger Logger) *Server{
+func NewServer(logger Logger) *Server {
 	return &Server{NewTCPTransport(":0", time.Second, logger)}
 }
 
@@ -16,7 +17,6 @@ type EchoRequest struct {
 type EchoResponse struct {
 	Msg string
 }
-
 
 func (s *Server) Echo(target string, msg string) (string, error) {
 	s.tcpTransport.Debug("Echo to  %s\n", target)
@@ -31,4 +31,3 @@ func (s *Server) Echo(target string, msg string) (string, error) {
 //func (s *Server) Consumer() <-chan RPC {
 //	return s.tcpTransport.consumer
 //}
-
